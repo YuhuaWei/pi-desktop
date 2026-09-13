@@ -1,0 +1,21 @@
+# 依赖
+node_modules/
+
+# 日志与运行时数据
+*.log
+app.log
+el-out.txt
+el-err.txt
+think-times.json
+
+# 备份文件
+*.bak
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 证书、密钥、环境文件
+.env
+*.pem
+*.key

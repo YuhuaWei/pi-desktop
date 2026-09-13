@@ -1,0 +1,12 @@
+{
+  "name": "pi-desktop",
+  "version": "1.0.0",
+  "description": "pi desktop app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^43.2.0"
+  }
+}
