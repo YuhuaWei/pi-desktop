@@ -135,6 +135,14 @@
   #thumb { position: absolute; top: 0; left: 0; width: 8px; border-radius: 4px; background: rgba(255,255,255,.14); }
   #thumb:hover { background: rgba(255,255,255,.3); }
   #chat { overscroll-behavior: contain; scroll-behavior: auto !important; }
+  /* 历史渲染的多段内容间距 */
+  .bubble > .bubble-text + .bubble-text,
+  .bubble > .bubble-text + .thinking-block,
+  .bubble > .thinking-block + .bubble-text,
+  .bubble > .thinking-block + .tool-block,
+  .bubble > .tool-block + .bubble-text,
+  .bubble > .tool-block + .tool-block,
+  .bubble > .thinking-block + .thinking-block { margin-top: 8px; }
   .msg {
     display: flex; margin-bottom: 20px; padding: 0 20px;
     transform: translateZ(0);
@@ -535,7 +543,8 @@ function downloadFile(name, content) {
 // ---------- 消息渲染 ----------
 function addMsg(role, text, noScroll) {
   const wrap = document.createElement('div');
-  wrap.className = 'msg ' + role;
+  // CSS 用 .msg.user / .msg.ai（历史渲染传入的 role 是 'assistant'，需映射）
+  wrap.className = 'msg ' + (role === 'user' ? 'user' : 'ai');
   wrap.innerHTML = `<div class="avatar">${role === 'user' ? '你' : 'pi'}</div><div class="bubble"><div class="bubble-text"></div></div>`;
   chatInner.appendChild(wrap);
   const bubble = wrap.querySelector('.bubble');
@@ -546,10 +555,18 @@ function addMsg(role, text, noScroll) {
 }
 function addMsgBlocks(role, blocks, noScroll) {
   const bubble = addMsg(role, '', noScroll);
-  const bt = bubble.querySelector('.bubble-text');
+  // 按 blocks 顺序渲染：每段内容依次 append（保持与流式输出一致的顺序）
+  const placeholder = bubble.querySelector('.bubble-text');
+  if (placeholder) placeholder.remove();
   let textAccum = '';
   const flush = () => {
-    if (textAccum.trim()) { bt.innerHTML += renderMarkdown(textAccum); textAccum = ''; }
+    if (textAccum.trim()) {
+      const t = document.createElement('div');
+      t.className = 'bubble-text';
+      t.innerHTML = renderMarkdown(textAccum);
+      bubble.appendChild(t);
+      textAccum = '';
+    }
   };
   for (const b of blocks || []) {
     if (b.type === 'text') { textAccum += b.text; }
@@ -558,7 +575,7 @@ function addMsgBlocks(role, blocks, noScroll) {
       const tb = document.createElement('details');
       tb.className = 'thinking-block';
       tb.innerHTML = '<summary>' + (b.secs ? '已思考（' + b.secs + '秒）' : '已思考') + '</summary><div class="thinking-body"></div>';
-      bubble.insertBefore(tb, bt);
+      bubble.appendChild(tb);
       tb.querySelector('.thinking-body').textContent = b.text;
     }
     else if (b.type === 'tool') {
