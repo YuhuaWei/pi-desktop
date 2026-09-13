@@ -317,7 +317,7 @@
   <button class="toolbar-btn" id="btn-model" onclick="showModelModal()" title="切换模型">模型: ...</button>
   <button class="toolbar-btn" id="btn-thinking" onclick="showThinkingModal()" title="切换思考强度">思考: ...</button>
   <button class="toolbar-btn" id="btn-theme" onclick="toggleTheme()" title="切换白天/黑夜模式">🌙</button>
-  <span class="busy-indicator" id="busy">ready</span>
+  <span class="busy-indicator" id="busy"></span>
   <div class="win-btns">
     <button class="win-btn" onclick="winControl('min')" title="最小化">─</button>
     <button class="win-btn" onclick="winControl('max')" title="最大化/还原">□</button>
@@ -1410,7 +1410,7 @@ async function send() {
     attachments = [];
     renderAttachBar();
     busy = false; sendBtn.disabled = false;
-    busyEl.textContent = 'ready'; busyEl.classList.remove('on');
+    busyEl.textContent = ''; busyEl.classList.remove('on');
     if (thinkingBlock) {
       const secs = ((performance.now() - thinkingStart) / 1000).toFixed(1);
       thinkingBlock.querySelector('summary').textContent = '已思考（' + secs + '秒）';
