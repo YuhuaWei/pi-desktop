@@ -135,6 +135,13 @@
   #thumb { position: absolute; top: 0; left: 0; width: 8px; border-radius: 4px; background: rgba(255,255,255,.14); }
   #thumb:hover { background: rgba(255,255,255,.3); }
   #chat { overscroll-behavior: contain; scroll-behavior: auto !important; }
+  .theme-opt {
+    flex: 1; padding: 8px 0; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--tool-bg); color: var(--text); cursor: pointer; font-size: 13px;
+    transition: border-color .15s, color .15s;
+  }
+  .theme-opt:hover { border-color: var(--accent); }
+  .theme-opt.active { border-color: var(--accent); color: var(--accent); background: rgba(99,102,241,.12); font-weight: 600; }
   /* 历史渲染的多段内容间距 */
   .bubble > .bubble-text + .bubble-text,
   .bubble > .bubble-text + .thinking-block,
@@ -324,7 +331,6 @@
   <span class="cwd" id="pi-ver" style="display:none"></span>
   <button class="toolbar-btn" id="btn-model" onclick="showModelModal()" title="切换模型">模型: ...</button>
   <button class="toolbar-btn" id="btn-thinking" onclick="showThinkingModal()" title="切换思考强度">思考: ...</button>
-  <button class="toolbar-btn" id="btn-theme" onclick="toggleTheme()" title="切换白天/黑夜模式">🌙</button>
   <button class="toolbar-btn" id="btn-settings" onclick="showSettingsModal()" title="设置">⚙ 设置</button>
   <span class="busy-indicator" id="busy"></span>
   <div class="win-btns">
@@ -396,23 +402,29 @@ function winControl(action) {
   } catch (e) {}
 }
 // ---- 主题切换（白天/黑夜）----
-function applyTheme(theme) {
-  document.body.classList.toggle('theme-light', theme === 'light');
-  const btn = document.getElementById('btn-theme');
-  if (btn) btn.textContent = theme === 'light' ? '☀️' : '🌙';
-  try { localStorage.setItem('pi-theme', theme); } catch (e) {}
+function systemPrefersLight() {
+  return !!(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
 }
-function toggleTheme() {
-  const isLight = document.body.classList.contains('theme-light');
-  applyTheme(isLight ? 'dark' : 'light');
+// mode: 'light' | 'dark' | 'auto'（跟随系统）
+function applyTheme(mode) {
+  if (mode !== 'light' && mode !== 'dark') mode = 'auto';
+  const effective = mode === 'auto' ? (systemPrefersLight() ? 'light' : 'dark') : mode;
+  document.body.classList.toggle('theme-light', effective === 'light');
+  try { localStorage.setItem('pi-theme', mode); } catch (e) {}
+}
+function getThemeMode() {
+  try { return localStorage.getItem('pi-theme') || 'auto'; } catch (e) { return 'auto'; }
 }
 (function initTheme() {
-  let theme = null;
-  try { theme = localStorage.getItem('pi-theme'); } catch (e) {}
-  if (!theme) {
-    theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-  }
-  applyTheme(theme);
+  applyTheme(getThemeMode());
+})();
+// 跟随系统：监听系统主题变化（仅在 auto 模式生效）
+(function watchSystemTheme() {
+  if (!window.matchMedia) return;
+  const mq = window.matchMedia('(prefers-color-scheme: light)');
+  const handler = () => { if (getThemeMode() === 'auto') applyTheme('auto'); };
+  if (mq.addEventListener) mq.addEventListener('change', handler);
+  else if (mq.addListener) mq.addListener(handler);
 })();
 // ---- 焦点状态指示 ----
 setInterval(() => {
@@ -469,8 +481,14 @@ function showSettingsModal() {
   const mask = document.createElement('div');
   mask.className = 'modal-mask show';
   const on = isTestMode();
+  const cur = getThemeMode();
+  const tb = (val, label) => '<button class="theme-opt' + (cur === val ? ' active' : '') + '" data-theme="' + val + '">' + label + '</button>';
   mask.innerHTML = '<div class="modal">' +
     '<h3>设置</h3>' +
+    '<div style="margin-bottom:16px">' +
+    '  <div style="font-size:13px;color:var(--muted);margin-bottom:8px">主题</div>' +
+    '  <div style="display:flex;gap:8px">' + tb('light', '亮色') + tb('dark', '暗色') + tb('auto', '跟随系统') + '</div>' +
+    '</div>' +
     '<label style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;cursor:pointer">' +
     '  <input type="checkbox" id="opt-test-mode"' + (on ? ' checked' : '') + ' style="width:16px;height:16px;margin-top:2px;cursor:pointer">' +
     '  <span>测试模式<div style="color:var(--muted);font-size:12px;margin-top:2px">显示性能诊断信息（聊天区诊断消息 + 右下角 FPS/焦点/GPU 浮层）。关闭后自动隐藏。</div></span>' +
@@ -479,6 +497,12 @@ function showSettingsModal() {
     '</div>';
   document.body.appendChild(mask);
   mask.addEventListener('click', (e) => { if (e.target === mask) mask.remove(); });
+  mask.querySelectorAll('.theme-opt').forEach((b) => {
+    b.addEventListener('click', () => {
+      applyTheme(b.dataset.theme);
+      mask.querySelectorAll('.theme-opt').forEach((x) => x.classList.toggle('active', x === b));
+    });
+  });
   mask.querySelector('#opt-test-mode').addEventListener('change', (e) => {
     localStorage.setItem('pi_test_mode', e.target.checked ? '1' : '0');
     _diagDone = false;
