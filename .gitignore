@@ -19,3 +19,6 @@ Thumbs.db
 .env
 *.pem
 *.key
+
+# 根目录临时维护脚本（web/server.mjs 等正式代码不受影响）
+/*.mjs
