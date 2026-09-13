@@ -1,9 +1,10 @@
 @echo off
-title pi Desktop
-cd /d C:\Users\17662
+rem 启动后端 + 用默认浏览器打开（无 Electron 时的轻量方式）
+cd /d "%~dp0"
 netstat -ano | findstr ":8787" | findstr "LISTENING" >nul 2>&1
 if errorlevel 1 (
-  start "pi-web-server" /min "C:\Users\17662\AppData\Local\pi-node\current\node.exe" "C:\Users\17662\pi-web\server.mjs"
+  cd /d "%USERPROFILE%"
+  start "pi-web-server" /min "%LOCALAPPDATA%\pi-node\current\node.exe" "%~dp0server.mjs"
   timeout /t 4 >nul
 )
-start "" "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --app=http://localhost:8787
+start "" http://localhost:8787
