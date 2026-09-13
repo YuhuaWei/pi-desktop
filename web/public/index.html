@@ -179,7 +179,9 @@
     background: var(--code-bg); padding: 1px 6px; border-radius: 4px; }
   .bubble pre code { background: none; padding: 0; }
   .bubble h1, .bubble h2, .bubble h3 { margin: 10px 0 6px; }
-  .bubble ul, .bubble ol { margin: 6px 0 8px; padding-left: 22px; }
+  .bubble ul, .bubble ol { margin: 6px 0 8px; padding-left: 24px; }
+  .bubble li { margin: 2px 0; overflow-wrap: anywhere; }
+  .bubble ul ul, .bubble ol ol, .bubble ul ol, .bubble ol ul { margin: 3px 0; padding-left: 18px; }
   .bubble a { color: var(--accent); }
   .bubble table { border-collapse: collapse; margin: 8px 0; }
   .bubble td, .bubble th { border: 1px solid var(--border); padding: 5px 10px; font-size: 13px; }
@@ -577,7 +579,27 @@ function renderMarkdown(text) {
   html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
              .replace(/\*([^*]+)\*/g, '<em>$1</em>');
   html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g, '<a href="$2" target="_blank">$1</a>');
-  html = html.replace(/^[-*]\s+(.*)$/gm, '<li>$1</li>');
+  // 列表：连续行聚合为 ul/ol（原实现生成裸 li 无容器，marker 会溢出气泡边界）
+  {
+    const _lines = html.split('\n');
+    const _out = [];
+    let _lt = null;
+    const _close = () => { if (_lt) { _out.push('</' + _lt + '>'); _lt = null; } };
+    for (const _line of _lines) {
+      const _m = _line.match(/^(\s*)([-*]|\d+\.)\s+(.+)$/);
+      if (_m) {
+        const _indent = _m[1].length || 0;
+        const _t = /\d+\./.test(_m[2]) ? 'ol' : 'ul';
+        if (_lt !== _t) { _close(); _out.push('<' + _t + '>'); _lt = _t; }
+        _out.push('<li' + (_indent > 0 ? ' style="margin-left:' + Math.min(_indent, 10) * 8 + 'px"' : '') + '>' + _m[3] + '</li>');
+      } else {
+        _close();
+        _out.push(_line);
+      }
+    }
+    _close();
+    html = _out.join('\n');
+  }
   html = html.replace(/^\|(.+)\|$/gm, (m, row) => {
     const cells = row.split('|').map(c => c.trim());
     if (cells.every(c => /^:?-{2,}:?$/.test(c))) return '';
