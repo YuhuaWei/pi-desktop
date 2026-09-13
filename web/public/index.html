@@ -325,6 +325,7 @@
   <button class="toolbar-btn" id="btn-model" onclick="showModelModal()" title="切换模型">模型: ...</button>
   <button class="toolbar-btn" id="btn-thinking" onclick="showThinkingModal()" title="切换思考强度">思考: ...</button>
   <button class="toolbar-btn" id="btn-theme" onclick="toggleTheme()" title="切换白天/黑夜模式">🌙</button>
+  <button class="toolbar-btn" id="btn-settings" onclick="showSettingsModal()" title="设置">⚙ 设置</button>
   <span class="busy-indicator" id="busy"></span>
   <div class="win-btns">
     <button class="win-btn" onclick="winControl('min')" title="最小化">─</button>
@@ -349,7 +350,7 @@
         <button id="send" onclick="send()">发送</button>
       </div>
       <div id="attach-bar" style="display:none;max-width:860px;margin:0 auto 8px;display:none;gap:8px;flex-wrap:wrap"></div>
-  <div id="fps-meter" style="position:fixed;bottom:6px;right:10px;font-size:11px;color:var(--muted);font-family:Consolas,monospace;z-index:99;pointer-events:none;text-align:right;line-height:1.5"><span id="fps-val">FPS: --</span><br><span id="focus-val">焦点: --</span><br><span id="gpu-val" style="font-size:10px;max-width:220px;display:inline-block">GPU: --</span></div>
+  <div id="fps-meter" style="position:fixed;bottom:6px;right:10px;font-size:11px;color:var(--muted);font-family:Consolas,monospace;z-index:99;pointer-events:none;text-align:right;line-height:1.5;display:none"><span id="fps-val">FPS: --</span><br><span id="focus-val">焦点: --</span><br><span id="gpu-val" style="font-size:10px;max-width:220px;display:inline-block">GPU: --</span></div>
     </div>
   </div>
 </div>
@@ -446,6 +447,7 @@ function runFpsDiagnosis() {
       probe.remove();
       const diag = document.createElement('div');
       diag.className = 'sys-msg ' + (fps >= 100 ? 'ok' : 'err');
+      diag.dataset.diag = '1';
       diag.innerHTML = '<div class="sys-bubble">性能诊断: rAF ' + fps + 'fps' +
         (fps >= 100 ? '（正常）' : '（疑似被外部限制! 请检查 NVIDIA 控制面板 → 管理 3D 设置 → 程序设置 → electron.exe → 最大帧速率/后台最大帧速率 → 设为不限制，或全局后台最大帧速率调高）') +
         '</div>';
@@ -455,8 +457,38 @@ function runFpsDiagnosis() {
   }
   requestAnimationFrame(tick);
 }
-// 页面加载 2 秒后自动诊断
-setTimeout(runFpsDiagnosis, 2000);
+// ---- 测试模式（性能诊断显示开关）----
+function isTestMode() { return localStorage.getItem('pi_test_mode') === '1'; }
+function applyTestMode() {
+  const on = isTestMode();
+  const fm = document.getElementById('fps-meter');
+  if (fm) fm.style.display = on ? 'block' : 'none';
+  if (!on) document.querySelectorAll('.sys-msg[data-diag]').forEach((el) => el.remove());
+}
+function showSettingsModal() {
+  const mask = document.createElement('div');
+  mask.className = 'modal-mask show';
+  const on = isTestMode();
+  mask.innerHTML = '<div class="modal">' +
+    '<h3>设置</h3>' +
+    '<label style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;cursor:pointer">' +
+    '  <input type="checkbox" id="opt-test-mode"' + (on ? ' checked' : '') + ' style="width:16px;height:16px;margin-top:2px;cursor:pointer">' +
+    '  <span>测试模式<div style="color:var(--muted);font-size:12px;margin-top:2px">显示性能诊断信息（聊天区诊断消息 + 右下角 FPS/焦点/GPU 浮层）。关闭后自动隐藏。</div></span>' +
+    '</label>' +
+    '<button class="close-btn" onclick="this.closest(\'.modal-mask\').remove()">关闭</button>' +
+    '</div>';
+  document.body.appendChild(mask);
+  mask.addEventListener('click', (e) => { if (e.target === mask) mask.remove(); });
+  mask.querySelector('#opt-test-mode').addEventListener('change', (e) => {
+    localStorage.setItem('pi_test_mode', e.target.checked ? '1' : '0');
+    _diagDone = false;
+    applyTestMode();
+    if (e.target.checked) runFpsDiagnosis();
+  });
+}
+applyTestMode();
+// 页面加载 2 秒后自动诊断（仅测试模式）
+setTimeout(() => { if (isTestMode()) runFpsDiagnosis(); }, 2000);
 // ---- FPS 计数器（rAF 实际触发频率）----
 (function fpsMeter() {
   let frames = 0, last = performance.now();
@@ -464,19 +496,21 @@ setTimeout(runFpsDiagnosis, 2000);
     frames++;
     const now = performance.now();
     if (now - last >= 1000) {
-      const el = document.getElementById('fps-meter');
-      const fv = document.getElementById('fps-val');
-      if (fv) fv.textContent = 'FPS: ' + Math.round(frames * 1000 / (now - last));
-      const gpuel = document.getElementById('gpu-val');
-      if (gpuel && gpuel.dataset.gpuChecked !== '1') {
-        gpuel.dataset.gpuChecked = '1';
-        try {
-          const c = document.createElement('canvas');
-          const gl = c.getContext('webgl2') || c.getContext('webgl');
-          const dbg = gl ? gl.getExtension('WEBGL_debug_renderer_info') : null;
-          const name = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : (gl ? 'WebGL OK' : 'NONE');
-          gpuel.textContent = 'GPU: ' + name;
-        } catch (e) { gpuel.textContent = 'GPU: ERR'; }
+      if (isTestMode()) {
+        const el = document.getElementById('fps-meter');
+        const fv = document.getElementById('fps-val');
+        if (fv) fv.textContent = 'FPS: ' + Math.round(frames * 1000 / (now - last));
+        const gpuel = document.getElementById('gpu-val');
+        if (gpuel && gpuel.dataset.gpuChecked !== '1') {
+          gpuel.dataset.gpuChecked = '1';
+          try {
+            const c = document.createElement('canvas');
+            const gl = c.getContext('webgl2') || c.getContext('webgl');
+            const dbg = gl ? gl.getExtension('WEBGL_debug_renderer_info') : null;
+            const name = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : (gl ? 'WebGL OK' : 'NONE');
+            gpuel.textContent = 'GPU: ' + name;
+          } catch (e) { gpuel.textContent = 'GPU: ERR'; }
+        }
       }
       frames = 0; last = now;
     }
